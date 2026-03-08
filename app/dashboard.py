@@ -203,6 +203,70 @@ def _chance_label(value: float, low_cut: float, high_cut: float) -> str:
     return "Low chance today"
 
 
+def _intervention_multiplier(
+    code_cleanup_pct: float,
+    rapid_response_pct: float,
+    hotspot_patrol_pct: float,
+) -> float:
+    # Compounded impact with conservative floor.
+    remaining = 1.0
+    remaining *= 1.0 - (code_cleanup_pct / 100.0) * 0.35
+    remaining *= 1.0 - (rapid_response_pct / 100.0) * 0.25
+    remaining *= 1.0 - (hotspot_patrol_pct / 100.0) * 0.20
+    return max(0.55, remaining)
+
+
+def _daily_profile(predicted_30d: float, lat: float, lon: float, multiplier: float = 1.0) -> list[float]:
+    out: list[float] = []
+    for day_index in range(31):
+        phase = 2.0 * np.pi * (day_index / 30.0)
+        lon_phase = np.deg2rad(lon)
+        lat_phase = np.deg2rad(lat)
+        wave = 0.75 + (day_index / 30.0) * 0.5 + 0.45 * np.sin(phase + lon_phase + 0.4 * lat_phase)
+        daily = max(0.0, (predicted_30d / 30.0) * wave * multiplier)
+        out.append(float(daily))
+    return out
+
+
+def _hidden_risk_flag(row: pd.Series, code_q90: float, req_q50: float) -> str:
+    code = float(row.get("code_violations_count", 0) or 0)
+    req = float(row.get("service_311_count", 0) or 0)
+    chance = str(row.get("chance_today", ""))
+    if code >= code_q90 and req <= req_q50 and chance != "High chance today":
+        return "Potential blind spot"
+    return "None"
+
+
+def _action_plan_text(
+    selected_area: str,
+    selected_row: pd.Series,
+    chance_today: str,
+    baseline_30d: float,
+    adjusted_30d: float,
+) -> str:
+    reduction = max(0.0, baseline_30d - adjusted_30d)
+    return (
+        f"# Action Plan: {selected_area}\n\n"
+        f"- Current risk signal: **{chance_today}**\n"
+        f"- Baseline expected requests (30d): **{baseline_30d:.0f}**\n"
+        f"- Simulated expected requests after interventions (30d): **{adjusted_30d:.0f}**\n"
+        f"- Simulated reduction: **{reduction:.0f} requests**\n\n"
+        "## Why this area\n"
+        f"- Open neighborhood code complaints: {float(selected_row.get('code_violations_count', 0)):.0f}\n"
+        f"- Past city service requests (311): {float(selected_row.get('service_311_count', 0)):.0f}\n"
+        f"- Places/POIs in this area: {float(selected_row.get('poi_count', 0)):.0f}\n\n"
+        "## Recommended 2-week playbook\n"
+        "1. Run focused code-enforcement sweep on top nuisance blocks.\n"
+        "2. Dispatch proactive cleanup for illegal dumping/trash hotspots.\n"
+        "3. Add temporary hotspot patrol windows during peak demand hours.\n"
+        "4. Re-evaluate this zone in 7 days and adjust resources.\n"
+    )
+
+
+def _safe_value(row: pd.Series, key: str) -> float:
+    return float(pd.to_numeric(pd.Series([row.get(key, 0)]), errors="coerce").fillna(0).iloc[0])
+
+
 def _extract_landmarks(frame: pd.DataFrame, source_tag: str) -> pd.DataFrame:
     if frame.empty:
         return pd.DataFrame()
@@ -515,6 +579,9 @@ def main() -> None:
     zone_df["area_label"] = _friendly_labels(zone_df, landmark_lookup, ensure_unique=True)
     zone_df["forecast_today_count"] = zone_df["risk_today"].apply(lambda v: _format_request_count(float(v)))
     zone_df["forecast_today_text"] = zone_df["risk_today"].apply(lambda v: _requests_phrase(float(v)))
+    code_q90 = float(zone_df["code_violations_count"].quantile(0.9)) if len(zone_df) else 0.0
+    req_q50 = float(zone_df["service_311_count"].quantile(0.5)) if len(zone_df) else 0.0
+    zone_df["hidden_risk_flag"] = zone_df.apply(lambda r: _hidden_risk_flag(r, code_q90, req_q50), axis=1)
 
     top_n = min(20, len(zone_df))
     top_cells = zone_df.nlargest(top_n, "risk_today").copy().reset_index(drop=True)
@@ -585,6 +652,72 @@ def main() -> None:
         st.markdown("")
         st.info(_roi_text(selected_row))
 
+    st.markdown("### Innovation Lab")
+    s1, s2, s3, s4 = st.columns(4)
+    code_cleanup_pct = s1.slider("Code cleanup effort", min_value=0, max_value=100, value=35, step=5)
+    rapid_response_pct = s2.slider("Rapid response coverage", min_value=0, max_value=100, value=30, step=5)
+    hotspot_patrol_pct = s3.slider("Hotspot patrol intensity", min_value=0, max_value=100, value=25, step=5)
+    event_surge_pct = s4.slider("Special events pressure", min_value=0, max_value=60, value=10, step=5)
+
+    intervention_mult = _intervention_multiplier(code_cleanup_pct, rapid_response_pct, hotspot_patrol_pct)
+    event_mult = 1.0 + (event_surge_pct / 100.0) * 0.45
+    zone_df["simulated_30d"] = zone_df["predicted_calls_next_30d"] * intervention_mult * event_mult
+    zone_df["simulated_today"] = zone_df["risk_today"] * intervention_mult * event_mult
+    zone_df["preventable_30d"] = (zone_df["predicted_calls_next_30d"] - zone_df["simulated_30d"]).clip(lower=0)
+
+    base_city_30d = float(zone_df["predicted_calls_next_30d"].sum())
+    sim_city_30d = float(zone_df["simulated_30d"].sum())
+    prevented_city_30d = max(0.0, base_city_30d - sim_city_30d)
+    il1, il2, il3 = st.columns(3)
+    il1.metric("Scenario Expected Requests (30d)", f"{sim_city_30d:.0f}")
+    il2.metric("Estimated Requests Prevented (30d)", f"{prevented_city_30d:.0f}")
+    il3.metric("Scenario Pressure vs Baseline", f"{(sim_city_30d / max(base_city_30d, 1e-9) - 1.0) * 100:.1f}%")
+
+    selected_baseline_30d = _safe_value(selected_row, "predicted_calls_next_30d")
+    selected_adjusted_30d = selected_baseline_30d * intervention_mult * event_mult
+    selected_chance = _chance_label(
+        float(selected_row["risk_today"]) * intervention_mult * event_mult,
+        low_cut * max(intervention_mult * event_mult, 1e-9),
+        high_cut * max(intervention_mult * event_mult, 1e-9),
+    )
+    plan_text = _action_plan_text(
+        selected_area.replace(" (Top 1)", ""),
+        selected_row,
+        selected_chance,
+        selected_baseline_30d,
+        selected_adjusted_30d,
+    )
+    st.download_button(
+        "Download Area Action Plan (.md)",
+        data=plan_text,
+        file_name="area_action_plan.md",
+        mime="text/markdown",
+        use_container_width=True,
+    )
+
+    curve_baseline = _daily_profile(
+        selected_baseline_30d,
+        float(selected_row["centroid_latitude"]),
+        float(selected_row["centroid_longitude"]),
+        multiplier=1.0,
+    )
+    curve_sim = _daily_profile(
+        selected_baseline_30d,
+        float(selected_row["centroid_latitude"]),
+        float(selected_row["centroid_longitude"]),
+        multiplier=intervention_mult * event_mult,
+    )
+    days = pd.date_range(selected_day, periods=31, freq="D")
+    curve_df = pd.DataFrame(
+        {
+            "date": days,
+            "Baseline": curve_baseline,
+            "Scenario": curve_sim,
+        }
+    ).set_index("date")
+    st.line_chart(curve_df, use_container_width=True)
+    st.caption("Scenario Lab chart: compare baseline demand vs your intervention scenario for this area.")
+
     st.markdown("### What This Means Today")
     a1, a2, a3 = st.columns(3)
     a1.info("Start with the top 3 areas below for cleanup and enforcement.")
@@ -593,7 +726,14 @@ def main() -> None:
 
     st.markdown("### Top Areas Today")
     top_table_raw = zone_df.nlargest(10, "risk_today")[
-        ["area_label", "risk_today", "predicted_calls_next_30d", "code_violations_count", "service_311_count"]
+        [
+            "area_label",
+            "risk_today",
+            "predicted_calls_next_30d",
+            "code_violations_count",
+            "service_311_count",
+            "hidden_risk_flag",
+        ]
     ].copy()
     action_labels = []
     for i in range(len(top_table_raw)):
@@ -617,6 +757,7 @@ def main() -> None:
                 lambda v: f"{float(v):.0f}"
             ),
             "Past city service requests (311)": top_table_raw["service_311_count"].apply(lambda v: f"{float(v):.0f}"),
+            "Blind-spot signal": top_table_raw["hidden_risk_flag"],
             "Why this area is prioritized": top_table_raw.apply(_why_flagged, axis=1),
         }
     )
@@ -625,6 +766,28 @@ def main() -> None:
         "Column meanings: Open neighborhood code complaints = unresolved property/neighborhood issues. "
         "Past city service requests (311) = historical requests from residents in that location."
     )
+
+    st.markdown("### Intervention Leaderboard")
+    leader = zone_df.nlargest(10, "preventable_30d")[
+        ["area_label", "predicted_calls_next_30d", "simulated_30d", "preventable_30d", "hidden_risk_flag"]
+    ].copy()
+    leader = leader.rename(
+        columns={
+            "area_label": "Location",
+            "predicted_calls_next_30d": "Baseline expected requests (30d)",
+            "simulated_30d": "Scenario expected requests (30d)",
+            "preventable_30d": "Estimated preventable requests (30d)",
+            "hidden_risk_flag": "Blind-spot signal",
+        }
+    )
+    for c in [
+        "Baseline expected requests (30d)",
+        "Scenario expected requests (30d)",
+        "Estimated preventable requests (30d)",
+    ]:
+        leader[c] = leader[c].map(lambda v: f"{float(v):.0f}")
+    st.dataframe(leader, use_container_width=True, hide_index=True)
+    st.caption("Use this leaderboard to prioritize where combined cleanup + response actions can create the largest impact.")
 
     st.markdown("### Pitch Brief Generator")
     if st.button("Generate Pitch Narrative", use_container_width=True):
