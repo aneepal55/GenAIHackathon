@@ -1,9 +1,9 @@
 # The Montgomery Guardian - Pitch Brief
 
 ## Executive Signal
-- Predicted service demand next 30 days: **1474.7 events** across monitored H3 cells.
+- Predicted service demand next 30 days: **1465.3 events** across monitored H3 cells.
 - High-risk pockets (top decile): **261 cells**.
-- Strongest model driver: **service_311_count**.
+- Strongest model driver: **historical_response_volume**.
 - Predictive target source: **received_311_service_requests**.
 
 ## Broken Windows Evidence
@@ -11,8 +11,8 @@
 - Permutation p-value: **0.562**.
 
 ## Predictive Reliability
-- Model R2: **0.4609396845685131**.
-- Model MAE: **0.6161006341910698** events per H3 cell.
+- Model R2: **0.4565695602779737**.
+- Model MAE: **0.6102401405682953** events per H3 cell.
 
 ## Policy Action
 - Resource Optimization: Prioritize code enforcement sweeps in top-decile vulnerability pockets before dispatch demand peaks.

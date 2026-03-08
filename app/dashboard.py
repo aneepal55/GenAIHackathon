@@ -39,6 +39,11 @@ def _load_predictions(path: Path) -> pd.DataFrame:
         "most_visited_total_visits",
         "distance_to_nearest_station_km",
         "distance_to_nearest_poi_km",
+        "predicted_calls_next_30d_p10",
+        "predicted_calls_next_30d_p90",
+        "prediction_uncertainty_30d",
+        "intervention_priority_score",
+        "demand_tier",
     ]
     for col in expected:
         if col not in df.columns:
@@ -82,6 +87,10 @@ def _aggregate_display_zones(df: pd.DataFrame, levels_up: int = 2) -> pd.DataFra
             most_visited_total_visits=("most_visited_total_visits", "sum"),
             distance_to_nearest_station_km=("distance_to_nearest_station_km", "mean"),
             distance_to_nearest_poi_km=("distance_to_nearest_poi_km", "mean"),
+            predicted_calls_next_30d_p10=("predicted_calls_next_30d_p10", "sum"),
+            predicted_calls_next_30d_p90=("predicted_calls_next_30d_p90", "sum"),
+            prediction_uncertainty_30d=("prediction_uncertainty_30d", "sum"),
+            intervention_priority_score=("intervention_priority_score", "sum"),
         )
     )
     centers = agg["display_zone"].apply(h3.cell_to_latlng)
@@ -497,6 +506,7 @@ def main() -> None:
     top_predictors_path = data_dir / "top_predictors.csv"
     model_metrics_path = data_dir / "model_metrics.json"
     moran_summary_path = data_dir / "bivariate_moran_summary.json"
+    governance_path = data_dir / "model_governance.json"
     metadata_path = data_dir / "metadata.json"
     df = _load_predictions(predictions_path)
     if df.empty:
@@ -541,6 +551,7 @@ def main() -> None:
     top_predictors = pd.read_csv(top_predictors_path) if top_predictors_path.exists() else pd.DataFrame()
     metrics = _read_json(model_metrics_path)
     moran = _read_json(moran_summary_path)
+    governance = _read_json(governance_path)
     target_source = str(metrics.get("target_source", "unknown"))
     high_risk_threshold = float(zone_df["risk_today"].quantile(0.9)) if len(zone_df) else 0.0
     if float(zone_df["risk_today"].sum()) == 0.0:
@@ -549,6 +560,8 @@ def main() -> None:
         high_risk_count = int((zone_df["risk_today"] >= high_risk_threshold).sum())
     total_pred_calls = float(zone_df["predicted_calls_next_30d"].sum())
     forecast_day_total = float(zone_df["risk_today"].sum())
+    total_uncertainty = float(zone_df["prediction_uncertainty_30d"].sum())
+    uncertainty_pct = (total_uncertainty / max(total_pred_calls, 1e-9)) * 100.0
     top_driver = str(top_predictors.iloc[0]["feature"]) if not top_predictors.empty else "n/a"
 
     k1, k2, k3, k4 = st.columns(4)
@@ -564,6 +577,10 @@ def main() -> None:
         "This is an estimate, not an exact count. 'Expected requests in next 30 days' means projected total service "
         "requests from that location over the upcoming month."
     )
+    st.caption(
+        f"Forecast confidence band (citywide): +/- {total_uncertainty / 2.0:.0f} requests "
+        f"({uncertainty_pct:.1f}% uncertainty width)."
+    )
 
     if view_mode == "Technical View":
         with st.expander("Technical Details"):
@@ -571,6 +588,15 @@ def main() -> None:
             st.write(f"Top predictor: `{top_driver}`")
             st.write(f"Bivariate Moran's I: `{moran.get('bivariate_moran_i', 'n/a')}`")
             st.write(f"Model R2: `{metrics.get('r2', 'n/a')}`")
+            if governance:
+                holdout = governance.get("evaluation", {}).get("holdout", {})
+                st.write(f"Model RMSE: `{holdout.get('rmse', metrics.get('rmse', 'n/a'))}`")
+                cv_ens = governance.get("evaluation", {}).get("cross_validation", {}).get("ensemble", {})
+                if cv_ens:
+                    st.write(
+                        "Cross-validation (ensemble): "
+                        f"MAE `{cv_ens.get('mae_mean', 'n/a')}`, R2 `{cv_ens.get('r2_mean', 'n/a')}`"
+                    )
             st.markdown("**Dataset Usage Check**")
             st.dataframe(_dataset_usage_summary(data_dir), use_container_width=True, hide_index=True)
 
@@ -638,8 +664,10 @@ def main() -> None:
             f"""
             <div class="metric-card">
               <b>Expected requests this month:</b> {_format_request_count(float(selected_row['predicted_calls_next_30d']))}<br/>
+              <b>Forecast range this month:</b> {_format_request_count(float(selected_row.get('predicted_calls_next_30d_p10', 0)))} to {_format_request_count(float(selected_row.get('predicted_calls_next_30d_p90', 0)))}<br/>
               <b>Chance of requests today:</b> {selected_row['chance_today']}<br/>
               <b>What that means:</b> {_requests_phrase(float(selected_row['risk_today']))}<br/>
+              <b>Uncertainty score (30d):</b> {_format_request_count(float(selected_row.get('prediction_uncertainty_30d', 0)))}<br/>
               <b>Code issues reported:</b> {selected_row.get('code_violations_count', 0):.0f}<br/>
               <b>311 requests (history):</b> {selected_row.get('service_311_count', 0):.0f}<br/>
               <b>Places/POIs in this area:</b> {selected_row.get('poi_count', 0):.0f}<br/>
@@ -788,6 +816,32 @@ def main() -> None:
         leader[c] = leader[c].map(lambda v: f"{float(v):.0f}")
     st.dataframe(leader, use_container_width=True, hide_index=True)
     st.caption("Use this leaderboard to prioritize where combined cleanup + response actions can create the largest impact.")
+
+    st.markdown("### AI Review Queue (High Uncertainty Zones)")
+    review_queue = zone_df.nlargest(8, "prediction_uncertainty_30d")[
+        [
+            "area_label",
+            "prediction_uncertainty_30d",
+            "predicted_calls_next_30d_p10",
+            "predicted_calls_next_30d_p90",
+            "code_violations_count",
+            "service_311_count",
+        ]
+    ].copy()
+    review_queue = review_queue.rename(
+        columns={
+            "area_label": "Location",
+            "prediction_uncertainty_30d": "Forecast spread (30d)",
+            "predicted_calls_next_30d_p10": "Lower estimate (30d)",
+            "predicted_calls_next_30d_p90": "Upper estimate (30d)",
+            "code_violations_count": "Open code complaints",
+            "service_311_count": "Past 311 requests",
+        }
+    )
+    for c in ["Forecast spread (30d)", "Lower estimate (30d)", "Upper estimate (30d)"]:
+        review_queue[c] = review_queue[c].map(lambda v: f"{float(v):.0f}")
+    review_queue["Action"] = "Send field verification + refresh data"
+    st.dataframe(review_queue, use_container_width=True, hide_index=True)
 
     st.markdown("### Pitch Brief Generator")
     if st.button("Generate Pitch Narrative", use_container_width=True):

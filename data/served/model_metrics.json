@@ -1,8 +1,32 @@
 {
-  "model": "random_forest_regressor",
+  "model": "ensemble_rf_gbr_quantile",
   "rows": 2607,
-  "mae": 0.6161006341910698,
-  "r2": 0.4609396845685131,
+  "mae": 0.6102401405682953,
+  "rmse": 1.833662670762249,
+  "r2": 0.4565695602779737,
+  "rf_mae": 0.6161006341910698,
+  "rf_r2": 0.4609396845685131,
+  "gbr_mae": 0.6193262355125619,
+  "gbr_r2": 0.44252025471687517,
+  "ensemble_weights": {
+    "random_forest": 0.6,
+    "gradient_boosting": 0.4
+  },
   "target_source": "received_311_service_requests",
-  "target_name": "target_calls_next_30d"
+  "target_name": "target_calls_next_30d",
+  "cv_summary": {
+    "folds": 5,
+    "rf": {
+      "mae_mean": 0.6011481216800327,
+      "r2_mean": 0.25798373348772674
+    },
+    "gbr": {
+      "mae_mean": 0.6066723487086503,
+      "r2_mean": 0.18932399535991667
+    },
+    "ensemble": {
+      "mae_mean": 0.5997217648816155,
+      "r2_mean": 0.24382437764293866
+    }
+  }
 }

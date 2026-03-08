@@ -1,10 +1,11 @@
 {
-  "generated_at_utc": "2026-03-08T20:37:12.173225+00:00",
+  "generated_at_utc": "2026-03-08T21:10:28.449184+00:00",
   "source_dir": "/Users/aneeshpallapolu/Documents/Repositories/GenAIHackathon/data/processed",
   "served_dir": "/Users/aneeshpallapolu/Documents/Repositories/GenAIHackathon/data/served",
   "copied_files": [
     "predictions.csv",
     "model_metrics.json",
+    "model_governance.json",
     "top_predictors.csv",
     "bivariate_moran_summary.json",
     "pitch_summary.md",

@@ -1,0 +1,53 @@
+{
+  "model_family": "stacked_ensemble",
+  "point_models": [
+    "random_forest_regressor",
+    "gradient_boosting_regressor"
+  ],
+  "uncertainty_model": "gradient_boosting_quantile",
+  "evaluation": {
+    "holdout": {
+      "mae": 0.6102401405682953,
+      "rmse": 1.833662670762249,
+      "r2": 0.4565695602779737
+    },
+    "cross_validation": {
+      "folds": 5,
+      "rf": {
+        "mae_mean": 0.6011481216800327,
+        "r2_mean": 0.25798373348772674
+      },
+      "gbr": {
+        "mae_mean": 0.6066723487086503,
+        "r2_mean": 0.18932399535991667
+      },
+      "ensemble": {
+        "mae_mean": 0.5997217648816155,
+        "r2_mean": 0.24382437764293866
+      }
+    }
+  },
+  "feature_count": 14,
+  "top_features": [
+    {
+      "feature": "historical_response_volume",
+      "importance": 0.3368810717090711
+    },
+    {
+      "feature": "service_311_count",
+      "importance": 0.3024035105142543
+    },
+    {
+      "feature": "code_violations_count",
+      "importance": 0.20873755083793105
+    },
+    {
+      "feature": "distance_to_nearest_poi_km",
+      "importance": 0.14837384903952489
+    },
+    {
+      "feature": "poi_count",
+      "importance": 0.0036040178992186108
+    }
+  ]
+}

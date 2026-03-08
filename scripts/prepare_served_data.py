@@ -10,6 +10,7 @@ import shutil
 DEFAULT_FILES = [
     "predictions.csv",
     "model_metrics.json",
+    "model_governance.json",
     "top_predictors.csv",
     "bivariate_moran_summary.json",
     "pitch_summary.md",

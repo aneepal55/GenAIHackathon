@@ -32,9 +32,10 @@ streamlit run app/dashboard.py
 
 ## Step 2 outputs
 - `data/processed/grid_features.csv`: engineered per-cell features.
-- `data/processed/predictions.csv`: predicted calls per H3 cell.
+- `data/processed/predictions.csv`: ensemble predictions + uncertainty bands per H3 cell.
 - `data/processed/top_predictors.csv`: model feature importance ranking.
-- `data/processed/model_metrics.json`: baseline model metrics (`MAE`, `R2`).
+- `data/processed/model_metrics.json`: holdout metrics (`MAE`, `RMSE`, `R2`) and base-model comparisons.
+- `data/processed/model_governance.json`: model governance artifact with CV summary and model stack details.
 - Step 2 now includes POI features when `point_of_interest.csv` exists:
   - `poi_count`
   - `distance_to_nearest_poi_km`
@@ -58,6 +59,9 @@ When 911 data is non-spatial (aggregated), Step 2 automatically uses spatial 311
   - Safety ROI panel for selected vulnerability pocket
   - Community View chance labels (`Low/Moderate/High chance today`) and non-decimal counts
   - Technical View with raw model diagnostics and dataset usage table
+  - Innovation Lab with intervention sliders + scenario simulation
+  - Forecast uncertainty band and AI review queue (high-uncertainty zones)
+  - Downloadable area action plan for operations teams
 
 ## Step 4 correlation + calibration
 - Launch with `python scripts/run_step4.py --input-dir data/processed --output-dir data/processed`.
