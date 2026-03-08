@@ -1,0 +1,22 @@
+{
+  "generated_at_utc": "2026-03-08T20:37:12.173225+00:00",
+  "source_dir": "/Users/aneeshpallapolu/Documents/Repositories/GenAIHackathon/data/processed",
+  "served_dir": "/Users/aneeshpallapolu/Documents/Repositories/GenAIHackathon/data/served",
+  "copied_files": [
+    "predictions.csv",
+    "model_metrics.json",
+    "top_predictors.csv",
+    "bivariate_moran_summary.json",
+    "pitch_summary.md",
+    "point_of_interest.csv",
+    "received_311_service_requests.csv"
+  ],
+  "missing_files": [
+    "most_visited_locations.csv",
+    "community_centers.csv",
+    "parks_and_trail.csv",
+    "education_facility.csv",
+    "pharmacy_locator.csv",
+    "business_license.csv"
+  ]
+}

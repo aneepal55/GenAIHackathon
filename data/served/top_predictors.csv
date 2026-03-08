@@ -1,0 +1,15 @@
+feature,importance
+service_311_count,0.3253611355922413
+historical_response_volume,0.312244086958252
+code_violations_count,0.2005935969632614
+distance_to_nearest_poi_km,0.1584433211083112
+poi_count,0.003357859377934044
+distance_to_nearest_station_km,0.0
+days_since_last_paving,0.0
+most_visited_count,0.0
+most_visited_total_visits,0.0
+community_centers_count,0.0
+parks_and_trail_count,0.0
+education_facility_count,0.0
+pharmacy_locator_count,0.0
+paving_project_count,0.0

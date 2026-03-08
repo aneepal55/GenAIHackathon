@@ -1,0 +1,96 @@
+datasets:
+  - name: "911_calls"
+    enabled: true
+    url: "https://services7.arcgis.com/xNUwUjOJqYE54USz/arcgis/rest/services/911_Calls_Data/FeatureServer/0/query"
+    where: "1=1"
+    out_fields: "*"
+    date_fields: ["call_time", "dispatch_time", "created_date"]
+    address_fields: ["address", "location", "street_address"]
+
+  - name: "code_violations"
+    enabled: true
+    url: "https://gis.montgomeryal.gov/server/rest/services/HostedDatasets/Code_Violations/FeatureServer/0/query"
+    where: "1=1"
+    out_fields: "*"
+    date_fields: ["open_date", "close_date", "created_date"]
+    address_fields: ["address", "property_address"]
+
+  - name: "paving_project"
+    enabled: true
+    url: "https://gis.montgomeryal.gov/server/rest/services/HostedDatasets/Paving_Project/MapServer/0/query"
+    where: "1=1"
+    out_fields: "*"
+    date_fields: ["project_start", "project_end", "updated_date", "created_date"]
+    address_fields: ["address", "street_name"]
+
+  - name: "fire_and_police_station"
+    enabled: false
+    url: ""
+    where: "1=1"
+    out_fields: "*"
+    date_fields: ["created_date"]
+    address_fields: ["address"]
+
+  - name: "city_limit"
+    enabled: true
+    url: "https://gis.montgomeryal.gov/server/rest/services/HostedDatasets/City_Limit/MapServer/0/query"
+    where: "1=1"
+    out_fields: "*"
+    date_fields: ["created_date", "updated_date"]
+    address_fields: []
+
+  - name: "received_311_service_requests"
+    enabled: true
+    url: "https://gis.montgomeryal.gov/server/rest/services/HostedDatasets/Received_311_Service_Request/MapServer/0/query"
+    where: "1=1"
+    out_fields: "*"
+    date_fields: ["created_date", "request_date", "closed_date"]
+    address_fields: ["address", "location", "street_address"]
+
+  - name: "point_of_interest"
+    enabled: true
+    url: "https://services7.arcgis.com/xNUwUjOJqYE54USz/arcgis/rest/services/Point_of_Interest/FeatureServer/0/query"
+    where: "1=1"
+    out_fields: "*"
+    date_fields: ["created_date"]
+    address_fields: ["name", "address"]
+
+  - name: "most_visited_locations"
+    enabled: false
+    url: "https://services7.arcgis.com/xNUwUjOJqYE54USz/arcgis/rest/services/Most_Visited_Locations/FeatureServer/0/query"
+    where: "1=1"
+    out_fields: "*"
+    date_fields: ["created_date", "date"]
+    address_fields: ["place_name", "name", "address", "location_name"]
+
+  - name: "community_centers"
+    enabled: false
+    url: "https://services7.arcgis.com/xNUwUjOJqYE54USz/arcgis/rest/services/Community_Center/FeatureServer/1/query?outFields=*&where=1%3D1"
+    where: "1=1"
+    out_fields: "*"
+    date_fields: ["created_date", "updated_date"]
+    address_fields: ["name", "facility_name", "address"]
+
+  - name: "parks_and_trail"
+    enabled: false
+    url: "https://services7.arcgis.com/xNUwUjOJqYE54USz/arcgis/rest/services/Park_and_Trail/FeatureServer/0/query?outFields=*&where=1%3D1"
+    where: "1=1"
+    out_fields: "*"
+    date_fields: ["created_date", "updated_date"]
+    address_fields: ["name", "trail_name", "address"]
+
+  - name: "education_facility"
+    enabled: false
+    url: "https://services7.arcgis.com/xNUwUjOJqYE54USz/arcgis/rest/services/Education_Facility/FeatureServer/0/query?outFields=*&where=1%3D1"
+    where: "1=1"
+    out_fields: "*"
+    date_fields: ["created_date", "updated_date"]
+    address_fields: ["name", "school_name", "address"]
+
+  - name: "pharmacy_locator"
+    enabled: false
+    url: "https://services7.arcgis.com/xNUwUjOJqYE54USz/arcgis/rest/services/Pharmacy_Locator/FeatureServer/0/query?outFields=*&where=1%3D1"
+    where: "1=1"
+    out_fields: "*"
+    date_fields: ["created_date", "updated_date"]
+    address_fields: ["name", "pharmacy_name", "address"]

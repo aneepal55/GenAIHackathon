@@ -1,0 +1,8 @@
+{
+  "model": "random_forest_regressor",
+  "rows": 2607,
+  "mae": 0.6161006341910698,
+  "r2": 0.4609396845685131,
+  "target_source": "received_311_service_requests",
+  "target_name": "target_calls_next_30d"
+}

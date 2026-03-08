@@ -1,0 +1,13 @@
+/venv
+/.venv
+__pycache__/
+*.pyc
+
+# Local training/build artifacts
+data/raw/*
+data/processed/*
+!data/processed/.gitkeep
+
+# Keep deploy snapshot in repo
+!data/served/
+!data/served/**

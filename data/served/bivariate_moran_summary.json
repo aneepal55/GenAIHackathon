@@ -1,0 +1,14 @@
+{
+  "bivariate_moran_i": -0.00997466048401048,
+  "p_value_two_sided": 0.562,
+  "response_dataset_used": "received_311_service_requests",
+  "permutations": 499,
+  "h3_resolution": 9,
+  "lag_days": 30,
+  "window_days": 30,
+  "predictor_window_start": "2026-01-01T14:46:30+00:00",
+  "predictor_window_end": "2026-01-31T14:46:30+00:00",
+  "response_window_start": "2026-01-31T14:46:30+00:00",
+  "response_window_end": "2026-03-02T14:46:30+00:00",
+  "n_cells": 863
+}
