@@ -18,3 +18,4 @@
 - Resource Optimization: Prioritize code enforcement sweeps in top-decile vulnerability pockets before dispatch demand peaks.
 - Equity Lens: Pair risk scores with response-distance to target underserved zones first.
 - Proactive Governance: Use weekly updates from this pipeline to shift from reactive dispatch to prevention-led operations.
+- Optimizer Scenario: **Budget $600,000: prevents about 140.9 requests/30d across 130 cells**.

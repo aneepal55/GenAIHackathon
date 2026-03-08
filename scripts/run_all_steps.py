@@ -16,6 +16,7 @@ from guardian.correlation import run_bivariate_moran
 from guardian.features import Step2Config, build_grid_features
 from guardian.ingest import run_ingestion
 from guardian.modeling import train_risk_model
+from guardian.optimization import generate_operations_plan
 from guardian.reporting import write_pitch_summary
 from bootstrap_sample_data import write_sample_data
 from prepare_served_data import prepare_served_data
@@ -67,6 +68,13 @@ def main() -> None:
         if grid.empty:
             raise RuntimeError("Feature grid is empty. Ensure data CSVs include latitude/longitude.")
         train_risk_model(grid, data_dir)
+
+        print("Step 3: Building operations optimizer artifacts...")
+        generate_operations_plan(
+            input_dir=data_dir,
+            output_dir=data_dir,
+            min_equity_share=0.35,
+        )
 
         print("Step 4: Running bivariate Moran correlation...")
         run_bivariate_moran(

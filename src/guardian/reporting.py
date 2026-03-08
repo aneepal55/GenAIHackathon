@@ -25,6 +25,7 @@ def build_pitch_summary(data_dir: str | Path) -> str:
     top_pred = _read_csv(data_path / "top_predictors.csv")
     moran = _read_json(data_path / "bivariate_moran_summary.json")
     metrics = _read_json(data_path / "model_metrics.json")
+    ops = _read_json(data_path / "operations_summary.json")
 
     total_pred_30d = float(pred["predicted_calls_next_30d"].sum()) if "predicted_calls_next_30d" in pred.columns else 0.0
     if "predicted_calls_next_30d" in pred.columns and len(pred) > 0:
@@ -42,6 +43,15 @@ def build_pitch_summary(data_dir: str | Path) -> str:
     r2 = metrics.get("r2")
     mae = metrics.get("mae")
     target_source = metrics.get("target_source", "unknown")
+    portfolio = ops.get("portfolio_summary", []) if isinstance(ops, dict) else []
+    ops_line = "n/a"
+    if portfolio:
+        best = sorted(portfolio, key=lambda x: float(x.get("prevented_calls_30d", 0)), reverse=True)[0]
+        ops_line = (
+            f"Budget ${int(best.get('budget_usd', 0)):,}: prevents about "
+            f"{float(best.get('prevented_calls_30d', 0)):.1f} requests/30d across "
+            f"{int(best.get('cells_touched', 0))} cells"
+        )
 
     lines = [
         "# The Montgomery Guardian - Pitch Brief",
@@ -64,6 +74,7 @@ def build_pitch_summary(data_dir: str | Path) -> str:
         "- Resource Optimization: Prioritize code enforcement sweeps in top-decile vulnerability pockets before dispatch demand peaks.",
         "- Equity Lens: Pair risk scores with response-distance to target underserved zones first.",
         "- Proactive Governance: Use weekly updates from this pipeline to shift from reactive dispatch to prevention-led operations.",
+        f"- Optimizer Scenario: **{ops_line}**.",
     ]
     return "\n".join(lines)
 

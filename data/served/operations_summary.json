@@ -1,0 +1,44 @@
+{
+  "optimizer_version": "v1_budgeted_multiaction",
+  "budget_levels_usd": [
+    120000,
+    300000,
+    600000
+  ],
+  "min_equity_share": 0.35,
+  "portfolio_summary": [
+    {
+      "budget_usd": 120000,
+      "actions_selected": 46,
+      "cells_touched": 27,
+      "spent_usd": 119048.14584102044,
+      "budget_utilization_pct": 99.20678820085035,
+      "prevented_calls_30d": 61.433830327337155,
+      "avg_roi_calls_prevented_per_1k": 0.515473876388944,
+      "equity_spend_share_pct": 100.0
+    },
+    {
+      "budget_usd": 300000,
+      "actions_selected": 115,
+      "cells_touched": 70,
+      "spent_usd": 299664.71240018844,
+      "budget_utilization_pct": 99.88823746672948,
+      "prevented_calls_30d": 99.58352151969204,
+      "avg_roi_calls_prevented_per_1k": 0.3328684064257524,
+      "equity_spend_share_pct": 100.0
+    },
+    {
+      "budget_usd": 600000,
+      "actions_selected": 226,
+      "cells_touched": 130,
+      "spent_usd": 599994.8155554802,
+      "budget_utilization_pct": 99.99913592591336,
+      "prevented_calls_30d": 140.8744755081981,
+      "avg_roi_calls_prevented_per_1k": 0.2367639643208339,
+      "equity_spend_share_pct": 100.0
+    }
+  ],
+  "alerts_generated": 120,
+  "critical_alerts": 120,
+  "elevated_alerts": 0
+}

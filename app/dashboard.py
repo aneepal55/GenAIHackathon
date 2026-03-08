@@ -152,6 +152,12 @@ def _read_json(path: Path) -> dict:
         return json.load(f)
 
 
+def _read_csv_optional(path: Path) -> pd.DataFrame:
+    if not path.exists():
+        return pd.DataFrame()
+    return pd.read_csv(path, low_memory=False)
+
+
 def _resolve_data_dir() -> Path:
     # Deployment default: served snapshot. Local fallback: processed artifacts.
     served = Path("data/served")
@@ -507,6 +513,10 @@ def main() -> None:
     model_metrics_path = data_dir / "model_metrics.json"
     moran_summary_path = data_dir / "bivariate_moran_summary.json"
     governance_path = data_dir / "model_governance.json"
+    ops_summary_path = data_dir / "operations_summary.json"
+    ops_portfolio_path = data_dir / "intervention_portfolio.csv"
+    ops_alerts_path = data_dir / "early_warning_alerts.csv"
+    equity_watchlist_path = data_dir / "equity_watchlist.csv"
     metadata_path = data_dir / "metadata.json"
     df = _load_predictions(predictions_path)
     if df.empty:
@@ -552,6 +562,10 @@ def main() -> None:
     metrics = _read_json(model_metrics_path)
     moran = _read_json(moran_summary_path)
     governance = _read_json(governance_path)
+    ops_summary = _read_json(ops_summary_path)
+    ops_portfolio = _read_csv_optional(ops_portfolio_path)
+    ops_alerts = _read_csv_optional(ops_alerts_path)
+    equity_watch = _read_csv_optional(equity_watchlist_path)
     target_source = str(metrics.get("target_source", "unknown"))
     high_risk_threshold = float(zone_df["risk_today"].quantile(0.9)) if len(zone_df) else 0.0
     if float(zone_df["risk_today"].sum()) == 0.0:
@@ -746,6 +760,64 @@ def main() -> None:
     st.line_chart(curve_df, use_container_width=True)
     st.caption("Scenario Lab chart: compare baseline demand vs your intervention scenario for this area.")
 
+    st.markdown("### Budget Optimizer (City Operations AI)")
+    if ops_summary and not ops_portfolio.empty:
+        options_budget = sorted(ops_portfolio["budget_usd"].dropna().astype(int).unique().tolist())
+        budget_choice = st.select_slider(
+            "Choose budget scenario",
+            options=options_budget,
+            value=options_budget[min(len(options_budget) - 1, 1)] if options_budget else 0,
+            format_func=lambda x: f"${x:,}",
+        )
+        portfolio_choice = ops_portfolio[ops_portfolio["budget_usd"].astype(int) == int(budget_choice)].copy()
+        if not portfolio_choice.empty:
+            portfolio_choice = portfolio_choice.sort_values("priority_score", ascending=False).head(20)
+            budget_info = None
+            for row in ops_summary.get("portfolio_summary", []):
+                if int(row.get("budget_usd", -1)) == int(budget_choice):
+                    budget_info = row
+                    break
+            p1, p2, p3, p4 = st.columns(4)
+            p1.metric("Planned Actions", f"{len(portfolio_choice)}")
+            p2.metric("Cells Covered", f"{portfolio_choice['h3_cell'].nunique()}")
+            p3.metric(
+                "Prevented Requests (30d)",
+                f"{float(portfolio_choice['prevented_calls_30d'].sum()):.0f}",
+            )
+            equity_spend_share = float(portfolio_choice.loc[portfolio_choice["underserved_flag"] == True, "cost_usd"].sum()) / max(float(portfolio_choice["cost_usd"].sum()), 1e-9) * 100.0
+            p4.metric("Equity Spend Share", f"{equity_spend_share:.1f}%")
+            if budget_info:
+                st.caption(
+                    f"Budget used: ${float(budget_info.get('spent_usd', 0)):,.0f} "
+                    f"({float(budget_info.get('budget_utilization_pct', 0)):.1f}% of budget). "
+                    f"Avg ROI: {float(budget_info.get('avg_roi_calls_prevented_per_1k', 0)):.2f} prevented requests per $1k."
+                )
+
+            portfolio_view = portfolio_choice.copy()
+            portfolio_view["Location"] = _friendly_labels(portfolio_view, landmark_lookup, ensure_unique=True)
+            portfolio_view = portfolio_view.rename(
+                columns={
+                    "action": "Recommended action",
+                    "cost_usd": "Estimated cost ($)",
+                    "prevented_calls_30d": "Estimated prevented requests (30d)",
+                    "roi_calls_prevented_per_1k": "ROI: prevented requests per $1k",
+                    "underserved_flag": "Underserved area",
+                }
+            )
+            keep = [
+                "Location",
+                "Recommended action",
+                "Estimated cost ($)",
+                "Estimated prevented requests (30d)",
+                "ROI: prevented requests per $1k",
+                "Underserved area",
+            ]
+            for c in ["Estimated cost ($)", "Estimated prevented requests (30d)", "ROI: prevented requests per $1k"]:
+                portfolio_view[c] = pd.to_numeric(portfolio_view[c], errors="coerce").fillna(0).map(lambda v: f"{v:.1f}")
+            st.dataframe(portfolio_view[keep], use_container_width=True, hide_index=True)
+    else:
+        st.info("Run the optimizer step to unlock budget planning: intervention portfolio, alerts, and equity watchlist.")
+
     st.markdown("### What This Means Today")
     a1, a2, a3 = st.columns(3)
     a1.info("Start with the top 3 areas below for cleanup and enforcement.")
@@ -842,6 +914,45 @@ def main() -> None:
         review_queue[c] = review_queue[c].map(lambda v: f"{float(v):.0f}")
     review_queue["Action"] = "Send field verification + refresh data"
     st.dataframe(review_queue, use_container_width=True, hide_index=True)
+
+    st.markdown("### Early Warning Radar")
+    if not ops_alerts.empty:
+        alerts_view = ops_alerts.head(12).copy()
+        alerts_view["Location"] = _friendly_labels(alerts_view, landmark_lookup, ensure_unique=True)
+        alerts_view = alerts_view.rename(
+            columns={
+                "alert_level": "Alert level",
+                "alert_reason": "Why flagged",
+                "predicted_calls_next_30d": "Expected requests (30d)",
+                "predicted_calls_next_30d_p90": "High-end estimate (30d)",
+                "stress_index": "Stress score",
+            }
+        )
+        keep = ["Location", "Alert level", "Why flagged", "Expected requests (30d)", "High-end estimate (30d)", "Stress score"]
+        for c in ["Expected requests (30d)", "High-end estimate (30d)", "Stress score"]:
+            alerts_view[c] = pd.to_numeric(alerts_view[c], errors="coerce").fillna(0).map(lambda v: f"{v:.1f}")
+        st.dataframe(alerts_view[keep], use_container_width=True, hide_index=True)
+    else:
+        st.caption("Early warning alerts will appear once `early_warning_alerts.csv` is available.")
+
+    st.markdown("### Equity Watchlist")
+    if not equity_watch.empty:
+        eq = equity_watch.head(10).copy()
+        eq["Location"] = _friendly_labels(eq, landmark_lookup, ensure_unique=True)
+        eq = eq.rename(
+            columns={
+                "alert_level": "Risk level",
+                "distance_to_nearest_station_km": "Distance to station (km)",
+                "stress_index": "Stress score",
+                "alert_reason": "Primary concern",
+            }
+        )
+        keep = ["Location", "Risk level", "Distance to station (km)", "Stress score", "Primary concern"]
+        for c in ["Distance to station (km)", "Stress score"]:
+            eq[c] = pd.to_numeric(eq[c], errors="coerce").fillna(0).map(lambda v: f"{v:.2f}")
+        st.dataframe(eq[keep], use_container_width=True, hide_index=True)
+    else:
+        st.caption("Equity watchlist will appear once `equity_watchlist.csv` is available.")
 
     st.markdown("### Pitch Brief Generator")
     if st.button("Generate Pitch Narrative", use_container_width=True):

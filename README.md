@@ -19,6 +19,7 @@ python scripts/bootstrap_sample_data.py --output-dir data/processed
 python scripts/run_step2.py --input-dir data/processed --output-dir data/processed --h3-resolution 9
 python scripts/run_step4.py --input-dir data/processed --output-dir data/processed --h3-resolution 9 --lag-days 30 --window-days 30 --permutations 499
 python scripts/run_step5.py --data-dir data/processed --output data/processed/pitch_summary.md
+python scripts/run_step6_ops.py --input-dir data/processed --output-dir data/processed --min-equity-share 0.35
 python scripts/run_all_steps.py --use-sample-data --data-dir data/processed
 python scripts/prepare_served_data.py --source-dir data/processed --served-dir data/served
 streamlit run app/dashboard.py
@@ -62,6 +63,21 @@ When 911 data is non-spatial (aggregated), Step 2 automatically uses spatial 311
   - Innovation Lab with intervention sliders + scenario simulation
   - Forecast uncertainty band and AI review queue (high-uncertainty zones)
   - Downloadable area action plan for operations teams
+  - Budget Optimizer with intervention portfolio by funding level
+  - Early Warning Radar and Equity Watchlist from backend analytics
+
+## Step 6 operations optimization
+- Launch with `python scripts/run_step6_ops.py --input-dir data/processed --output-dir data/processed`.
+- Outputs:
+  - `data/processed/intervention_candidates.csv`
+  - `data/processed/intervention_portfolio.csv`
+  - `data/processed/early_warning_alerts.csv`
+  - `data/processed/equity_watchlist.csv`
+  - `data/processed/operations_summary.json`
+- Purpose:
+  - Build budget-constrained intervention plans
+  - Enforce equity allocation floor for underserved areas
+  - Surface high-stress zones needing immediate validation/action
 
 ## Step 4 correlation + calibration
 - Launch with `python scripts/run_step4.py --input-dir data/processed --output-dir data/processed`.
