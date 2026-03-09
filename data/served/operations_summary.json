@@ -38,7 +38,7 @@
       "equity_spend_share_pct": 100.0
     }
   ],
-  "alerts_generated": 120,
-  "critical_alerts": 120,
-  "elevated_alerts": 0
+  "alerts_generated": 2607,
+  "critical_alerts": 261,
+  "elevated_alerts": 391
 }

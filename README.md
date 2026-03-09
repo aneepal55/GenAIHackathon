@@ -66,6 +66,27 @@ When 911 data is non-spatial (aggregated), Step 2 automatically uses spatial 311
   - Budget Optimizer with intervention portfolio by funding level
   - Early Warning Radar and Equity Watchlist from backend analytics
 
+## Next.js frontend (primary demo UI)
+- A new frontend app is available in `frontend/` and reads real artifacts from `data/served`.
+- Streamlit remains intact as backup.
+- Run:
+```bash
+cd frontend
+npm install
+npm run dev
+```
+- Open `http://localhost:3000`.
+- The Next app consumes:
+  - `data/served/predictions.csv`
+  - `data/served/model_metrics.json`
+  - `data/served/bivariate_moran_summary.json`
+  - `data/served/top_predictors.csv`
+  - `data/served/operations_summary.json`
+  - `data/served/intervention_portfolio.csv`
+  - `data/served/early_warning_alerts.csv`
+  - `data/served/equity_watchlist.csv`
+  - location context datasets in `data/served/*.csv`
+
 ## Step 6 operations optimization
 - Launch with `python scripts/run_step6_ops.py --input-dir data/processed --output-dir data/processed`.
 - Outputs:
@@ -104,3 +125,4 @@ When 911 data is non-spatial (aggregated), Step 2 automatically uses spatial 311
   - `python scripts/run_all_steps.py --config config/datasets.yaml --data-dir data/processed --publish-served --served-dir data/served`
 - The dashboard reads from `data/served` first (fallback: `data/processed`).
 - Deploy only the Streamlit app + `data/served` snapshot so judges do not need to run training.
+- For Next.js deployment, deploy `frontend/` and keep `data/served` bundled/available on the server filesystem.

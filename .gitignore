@@ -11,3 +11,8 @@ data/processed/*
 # Keep deploy snapshot in repo
 !data/served/
 !data/served/**
+
+# Next.js frontend
+frontend/node_modules/
+frontend/.next/
+frontend/out/

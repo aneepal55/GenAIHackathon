@@ -23,6 +23,7 @@ def _zscore(series: pd.Series) -> pd.Series:
 
 def _build_candidates(pred: pd.DataFrame) -> pd.DataFrame:
     work = pred.copy()
+    missing_station = pd.Series(False, index=work.index)
     for col in [
         "predicted_calls_next_30d",
         "code_violations_count",
@@ -33,31 +34,57 @@ def _build_candidates(pred: pd.DataFrame) -> pd.DataFrame:
         "centroid_longitude",
     ]:
         if col not in work.columns:
-            work[col] = 0.0
-        work[col] = pd.to_numeric(work[col], errors="coerce").fillna(0.0)
+            work[col] = np.nan
+        work[col] = pd.to_numeric(work[col], errors="coerce")
+
+    # Keep station distance as NaN for display/output when unavailable.
+    # Use median-imputed values only for ranking/optimization math.
+    missing_station = work["distance_to_nearest_station_km"].isna()
+    station_for_score = work["distance_to_nearest_station_km"].copy()
+    if station_for_score.notna().any():
+        station_for_score = station_for_score.fillna(float(station_for_score.median()))
+    else:
+        station_for_score = station_for_score.fillna(0.0)
+    work["distance_to_nearest_station_km_for_score"] = station_for_score
+    has_station_signal = bool(work["distance_to_nearest_station_km"].notna().any())
+
+    # Other model columns can safely default to 0 when absent.
+    for col in [
+        "predicted_calls_next_30d",
+        "code_violations_count",
+        "service_311_count",
+        "prediction_uncertainty_30d",
+        "centroid_latitude",
+        "centroid_longitude",
+    ]:
+        work[col] = work[col].fillna(0.0)
 
     if "h3_cell" not in work.columns:
         work["h3_cell"] = [f"cell_{i}" for i in range(len(work))]
 
-    station_q75 = float(work["distance_to_nearest_station_km"].quantile(0.75)) if len(work) else 0.0
-    work["underserved_flag"] = (
-        (work["distance_to_nearest_station_km"] >= station_q75) | (work["prediction_uncertainty_30d"] > 0)
-    )
+    station_q75 = float(work["distance_to_nearest_station_km_for_score"].quantile(0.75)) if len(work) else 0.0
+    if has_station_signal:
+        work["underserved_flag"] = (
+            (work["distance_to_nearest_station_km_for_score"] >= station_q75) | (work["prediction_uncertainty_30d"] > 0)
+        )
+    else:
+        work["underserved_flag"] = work["prediction_uncertainty_30d"] > 0
 
     rows: list[dict] = []
-    for _, row in work.iterrows():
+    for idx, row in work.iterrows():
         base = float(row["predicted_calls_next_30d"])
         if base <= 0:
             continue
 
         code = float(row["code_violations_count"])
         service_311 = float(row["service_311_count"])
-        station = float(row["distance_to_nearest_station_km"])
+        station_for_calc = float(row["distance_to_nearest_station_km_for_score"])
+        station_raw = float(row["distance_to_nearest_station_km"]) if not bool(missing_station.loc[idx]) else np.nan
         uncertainty = float(row["prediction_uncertainty_30d"])
 
         code_intensity = min(1.0, np.log1p(max(0.0, code)) / 4.0)
         service_intensity = min(1.0, np.log1p(max(0.0, service_311)) / 6.0)
-        station_gap = min(1.0, max(0.0, station) / 5.0)
+        station_gap = min(1.0, max(0.0, station_for_calc) / 5.0) if has_station_signal else 0.0
         uncertainty_intensity = min(1.0, np.log1p(max(0.0, uncertainty)) / 4.0)
 
         actions = [
@@ -102,7 +129,7 @@ def _build_candidates(pred: pd.DataFrame) -> pd.DataFrame:
                     "roi_calls_prevented_per_1k": roi,
                     "code_violations_count": code,
                     "service_311_count": service_311,
-                    "distance_to_nearest_station_km": station,
+                    "distance_to_nearest_station_km": station_raw,
                     "prediction_uncertainty_30d": uncertainty,
                     "underserved_flag": bool(row["underserved_flag"]),
                 }
@@ -188,15 +215,37 @@ def _early_warning_alerts(pred: pd.DataFrame) -> pd.DataFrame:
         "centroid_longitude",
     ]:
         if col not in work.columns:
-            work[col] = 0.0
-        work[col] = pd.to_numeric(work[col], errors="coerce").fillna(0.0)
+            work[col] = np.nan
+        work[col] = pd.to_numeric(work[col], errors="coerce")
+
+    station_raw = work["distance_to_nearest_station_km"].copy()
+    station_for_score = station_raw.copy()
+    if station_for_score.notna().any():
+        station_for_score = station_for_score.fillna(float(station_for_score.median()))
+    else:
+        station_for_score = station_for_score.fillna(0.0)
+
+    for col in [
+        "predicted_calls_next_30d",
+        "predicted_calls_next_30d_p90",
+        "code_violations_count",
+        "service_311_count",
+        "prediction_uncertainty_30d",
+        "centroid_latitude",
+        "centroid_longitude",
+    ]:
+        work[col] = work[col].fillna(0.0)
+
+    work["distance_to_nearest_station_km_for_score"] = station_for_score
+    work["distance_to_nearest_station_km"] = station_raw
+    has_station_signal = bool(work["distance_to_nearest_station_km"].notna().any())
 
     stress = (
         0.35 * _zscore(work["predicted_calls_next_30d"])
         + 0.20 * _zscore(work["code_violations_count"])
         + 0.20 * _zscore(work["service_311_count"])
         + 0.15 * _zscore(work["prediction_uncertainty_30d"])
-        + 0.10 * _zscore(work["distance_to_nearest_station_km"])
+        + 0.10 * _zscore(work["distance_to_nearest_station_km_for_score"])
     )
     work["stress_index"] = stress
 
@@ -209,6 +258,7 @@ def _early_warning_alerts(pred: pd.DataFrame) -> pd.DataFrame:
     )
 
     reasons: list[str] = []
+    station_q75 = float(work["distance_to_nearest_station_km_for_score"].quantile(0.75)) if len(work) else 0.0
     for _, row in work.iterrows():
         triggers: list[str] = []
         if row["predicted_calls_next_30d"] >= float(work["predicted_calls_next_30d"].quantile(0.85)):
@@ -217,7 +267,7 @@ def _early_warning_alerts(pred: pd.DataFrame) -> pd.DataFrame:
             triggers.append("concentrated code issues")
         if row["prediction_uncertainty_30d"] >= float(work["prediction_uncertainty_30d"].quantile(0.85)):
             triggers.append("high forecast uncertainty")
-        if row["distance_to_nearest_station_km"] >= float(work["distance_to_nearest_station_km"].quantile(0.75)):
+        if has_station_signal and row["distance_to_nearest_station_km_for_score"] >= station_q75:
             triggers.append("longer response distance")
         if not triggers:
             triggers.append("stacked moderate stress signals")
@@ -238,7 +288,7 @@ def _early_warning_alerts(pred: pd.DataFrame) -> pd.DataFrame:
         "prediction_uncertainty_30d",
         "distance_to_nearest_station_km",
     ]
-    return work[cols].sort_values("stress_index", ascending=False).head(120).reset_index(drop=True)
+    return work[cols].sort_values("stress_index", ascending=False).reset_index(drop=True)
 
 
 def generate_operations_plan(

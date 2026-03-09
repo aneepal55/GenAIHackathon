@@ -121,12 +121,17 @@ def _haversine_km(lat1: np.ndarray, lon1: np.ndarray, lat2: np.ndarray, lon2: np
 
 
 def _nearest_station_distance_km(cells: pd.Series, station_df: pd.DataFrame) -> pd.Series:
-    if station_df.empty or "latitude" not in station_df.columns or "longitude" not in station_df.columns:
+    if station_df.empty:
         return pd.Series(np.nan, index=cells.index)
 
     stations = station_df.copy()
-    stations["latitude"] = pd.to_numeric(stations["latitude"], errors="coerce")
-    stations["longitude"] = pd.to_numeric(stations["longitude"], errors="coerce")
+    lat_col = _pick_column(stations.columns, ["latitude", "lat", "y"])
+    lon_col = _pick_column(stations.columns, ["longitude", "lon", "lng", "x"])
+    if lat_col is None or lon_col is None:
+        return pd.Series(np.nan, index=cells.index)
+
+    stations["latitude"] = pd.to_numeric(stations[lat_col], errors="coerce")
+    stations["longitude"] = pd.to_numeric(stations[lon_col], errors="coerce")
     stations = stations.dropna(subset=["latitude", "longitude"])
     if stations.empty:
         return pd.Series(np.nan, index=cells.index)
